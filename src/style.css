@@ -194,7 +194,7 @@ a svg {
   position: relative;
   z-index: 2;
   max-width: 650px;
-  align-self: start;
+  align-self: center;
 }
 .eyebrow {
   display: flex;
@@ -221,24 +221,6 @@ a svg {
   position: absolute;
   right: -1px;
   top: -1px;
-}
-h1 {
-  font-family: var(--display);
-  font-size: clamp(42px, 4.2vw, 64px);
-  line-height: 1.05;
-  letter-spacing: -3px;
-  font-weight: 500;
-  margin: 18px 0 15px;
-}
-h1 > span {
-  color: var(--lime);
-}
-.hero-description {
-  font-size: 13px;
-  line-height: 1.8;
-  color: #a0a9af;
-  letter-spacing: 0.05px;
-  margin: 0;
 }
 .locate-button {
   display: flex;
@@ -413,13 +395,8 @@ h1 > span {
   position: relative;
   z-index: 3;
   width: 100%;
-  border: 1px solid #c5f78b30;
-  border-radius: 8px;
-  background: linear-gradient(120deg, #12171be8, #0b0f13e8);
-  backdrop-filter: blur(16px);
-  padding: 24px 26px 16px;
-  margin-top: 24px;
-  box-shadow: 0 10px 40px #0002;
+  padding: 0;
+  margin: 0;
 }
 .moment-heading {
   display: flex;
@@ -465,9 +442,56 @@ h1 > span {
 }
 .conversion-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
-  gap: 12px;
+  gap: 24px;
+}
+.conversion-origin {
+  display: grid;
+  grid-template-columns: 1fr auto;
+}
+.conversion-origin .conversion-place,
+.origin-time {
+  grid-column: 1 / -1;
+}
+.conversion-origin .conversion-place {
+  font-size: 22px;
+}
+.conversion-origin .conversion-hint {
+  justify-self: end;
+}
+.conversion-result {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 20px;
+  padding: 20px;
+  border: 1px solid #c5f78b25;
+  background: #10191bbd;
+  backdrop-filter: blur(16px);
+  border-radius: 8px;
+}
+.conversion-result .clock-label {
+  grid-column: 1;
+  grid-row: 1;
+}
+.conversion-result .conversion-place {
+  grid-column: 1;
+  grid-row: 2;
+  margin-bottom: 0;
+}
+.conversion-result .result-time {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  align-self: center;
+}
+.conversion-result .comparison-date {
+  grid-column: 1;
+  grid-row: 3;
+}
+.conversion-result .conversion-hint {
+  grid-column: 2;
+  grid-row: 3;
+  justify-self: end;
 }
 .clock-label {
   display: block;
@@ -551,14 +575,9 @@ h1 > span {
   color: #8d9d9e;
   font-size: 0.9em;
 }
-.conversion-arrow {
-  color: #738575;
-  align-self: center;
-}
 .origin-time,
 .result-time {
   display: block;
-  font-size: clamp(48px, 4.8vw, 72px);
   font-family: var(--display);
   letter-spacing: -3px;
   line-height: 1.1;
@@ -566,8 +585,14 @@ h1 > span {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+.origin-time {
+  font-size: clamp(110px, 10.5vw, 160px);
+  letter-spacing: -7px;
+  line-height: 1;
+}
 .result-time {
   color: var(--lime);
+  font-size: 72px;
 }
 .comparison-date {
   display: flex;
@@ -1111,9 +1136,6 @@ footer button {
     height: 690px;
     top: 30px;
   }
-  .hero-description {
-    font-size: 14px;
-  }
 }
 @media (max-width: 1150px) {
   .app-shell {
@@ -1132,10 +1154,6 @@ footer button {
     min-height: 690px;
     grid-template-columns: 55% 45%;
   }
-  h1 {
-    font-size: 48px;
-    letter-spacing: -2.5px;
-  }
   .globe-stage {
     width: 62%;
     height: 550px;
@@ -1153,12 +1171,8 @@ footer button {
   .globe-tools {
     right: 11%;
   }
-  .moment-panel {
-    padding: 22px 20px 14px;
-  }
-  .conversion-grid {
-    gap: 10px;
-    grid-template-columns: minmax(0, 1fr) 20px minmax(0, 1fr);
+  .result-time {
+    font-size: 64px;
   }
   .city-time {
     font-size: 40px;
@@ -1187,16 +1201,9 @@ footer button {
     display: flex;
     flex-direction: column;
   }
-  h1 {
-    font-size: 51px;
-    letter-spacing: -2.5px;
-  }
   .hero .eyebrow {
     font-size: 7px;
     letter-spacing: 1.2px;
-  }
-  .hero-description {
-    font-size: 13px;
   }
   .globe-stage {
     position: relative;
@@ -1214,15 +1221,9 @@ footer button {
     right: 8%;
     top: 31%;
   }
-  .moment-panel {
-    width: 100%;
-    padding: 24px;
+  .origin-time {
+    font-size: 150px;
   }
-  .conversion-grid {
-    grid-template-columns: minmax(0, 1fr) 30px minmax(0, 1fr);
-    gap: 16px;
-  }
-  .origin-time,
   .result-time {
     font-size: 72px;
   }
@@ -1295,18 +1296,6 @@ footer button {
     font-size: 7px;
     letter-spacing: 1.6px;
   }
-  h1 {
-    font-size: 38px;
-    letter-spacing: -1.9px;
-    line-height: 1.08;
-    margin-top: 16px;
-    margin-bottom: 12px;
-  }
-  .hero-description {
-    font-size: 11px;
-    line-height: 1.85;
-    margin-bottom: 0;
-  }
   .locate-button {
     font-size: 10px;
   }
@@ -1363,12 +1352,6 @@ footer button {
   .globe-instruction svg {
     width: 12px;
   }
-  .moment-panel {
-    padding: 17px 16px 18px;
-    margin-top: 20px;
-    width: 100%;
-    border-radius: 7px;
-  }
   .moment-heading {
     margin-bottom: 23px;
   }
@@ -1377,9 +1360,15 @@ footer button {
     letter-spacing: 1px;
   }
   .conversion-grid {
-    grid-template-columns: minmax(0, 1fr) 18px minmax(0, 1fr);
-    gap: 10px;
+    gap: 22px;
     position: relative;
+  }
+  .conversion-result {
+    padding: 17px 14px;
+    column-gap: 10px;
+  }
+  .conversion-origin .conversion-place {
+    font-size: 21px;
   }
   .clock-label {
     font-size: 9px;
@@ -1394,12 +1383,12 @@ footer button {
     font-size: 11px;
     margin-top: 7px;
   }
-  .conversion-arrow {
-    width: 16px;
+  .origin-time {
+    font-size: clamp(88px, 28vw, 128px);
+    letter-spacing: -5px;
   }
-  .origin-time,
   .result-time {
-    font-size: clamp(36px, 11vw, 56px);
+    font-size: clamp(42px, 13vw, 60px);
     letter-spacing: -2px;
   }
   .comparison-date {
@@ -1557,18 +1546,8 @@ footer button {
   }
 }
 @media (max-width: 365px) {
-  h1 {
-    font-size: 34px;
-  }
   .globe-stage {
     height: 380px;
-  }
-  .conversion-grid {
-    gap: 7px;
-  }
-  .moment-panel {
-    padding-left: 13px;
-    padding-right: 13px;
   }
   .conversion-place {
     font-size: 12px;
@@ -1589,7 +1568,7 @@ footer button {
     display: none;
   }
 }
-@media (hover: none) and (pointer: coarse) {
+@media (max-width: 600px), (hover: none) and (pointer: coarse) {
   .mouse-instruction {
     display: none;
   }

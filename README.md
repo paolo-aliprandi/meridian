@@ -31,7 +31,8 @@ rules come from the browser's IANA data; keep the browser current. The globe's
 terminator is astronomical. City card sun/moon icons use approximate local daytime
 (07:00–19:00), not local sunrise calculations.
 
-The primary comparison keeps both clocks, their date-specific abbreviations
+The live digital time is the hero, rather than a marketing headline. The primary
+comparison keeps both times, their date-specific abbreviations
 (EST/EDT, CET/CEST, etc.), UTC offsets, and the time difference together above the
 fold. Hovering previews a place in that same comparison; clicking selects it.
 Calendar-day badges make next/previous-day conversions explicit. Abbreviations

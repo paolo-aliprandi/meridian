@@ -17,8 +17,14 @@ test("desktop globe renders, rotates, hovers, selects, and toggles boundaries", 
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("./");
   await expect(
-    page.getByRole("heading", { name: /What time is it/ }),
+    page.getByRole("heading", { name: "World clock and time zone converter" }),
   ).toBeVisible();
+  await expect(page.locator("#hero-heading")).toHaveClass("sr-only");
+  expect(
+    await page
+      .locator(".origin-time")
+      .evaluate((element) => parseFloat(getComputedStyle(element).fontSize)),
+  ).toBeGreaterThan(100);
   await expect(page.locator(".origin-time")).toBeInViewport({ ratio: 1 });
   await expect(page.locator(".result-time")).toBeInViewport({ ratio: 1 });
   await expect(page.locator(".comparison-summary")).toBeInViewport({
@@ -255,11 +261,14 @@ test("mobile is responsive and tapping the globe selects a time zone", async ({
   await expect(page.locator(".origin-time")).toBeInViewport({ ratio: 1 });
   await expect(page.locator(".result-time")).toBeInViewport({ ratio: 1 });
   await expect(page.locator(".day-offset")).toHaveText("+1 day");
-  const homeClock = await page.locator(".origin-time").boundingBox();
-  const destinationClock = await page.locator(".result-time").boundingBox();
-  expect(homeClock).not.toBeNull();
-  expect(destinationClock).not.toBeNull();
-  expect(Math.abs(homeClock!.y - destinationClock!.y)).toBeLessThan(1);
+  const homeFontSize = await page
+    .locator(".origin-time")
+    .evaluate((element) => parseFloat(getComputedStyle(element).fontSize));
+  const destinationFontSize = await page
+    .locator(".result-time")
+    .evaluate((element) => parseFloat(getComputedStyle(element).fontSize));
+  expect(homeFontSize).toBeGreaterThan(80);
+  expect(homeFontSize).toBeGreaterThan(destinationFontSize * 1.7);
   for (const selector of [
     ".conversion-origin",
     ".conversion-result",

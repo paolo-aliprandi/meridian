@@ -1,6 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import {
-  ArrowRight,
   ArrowUpRight,
   Check,
   CalendarClock,
@@ -307,26 +306,17 @@ function App() {
       <main>
         <section className="hero" id="explore" aria-labelledby="hero-heading">
           <div className="hero-copy">
-            <div className="eyebrow">
-              <span className="tiny-orbit" /> THE WORLD CLOCK, REIMAGINED
-            </div>
-            <h1 id="hero-heading">
-              What time is it
-              <br />
-              <span>over there?</span>
+            <h1 id="hero-heading" className="sr-only">
+              World clock and time zone converter
             </h1>
-            <p className="hero-description">
-              Your time, their time, and the difference. Instantly.
-              <br />
-              Choose a place or explore the globe.
-            </p>
             <section
               className={`moment-panel ${timeError ? "has-time-error" : ""}`}
               aria-label="Time comparison"
             >
               <div className="moment-heading">
                 <span className="micro-label">
-                  <span className="mini-line" /> YOUR WORLD, SIDE BY SIDE
+                  <span className="mini-line" />{" "}
+                  {customInstant ? "YOUR CHOSEN TIME" : "YOUR LOCAL TIME"}
                 </span>
                 <button
                   className={`live-switch ${!customInstant && !timeError ? "is-live" : ""}`}
@@ -348,7 +338,6 @@ function App() {
               </div>
               <div className="conversion-grid">
                 <div className="conversion-origin">
-                  <span className="clock-label">YOUR TIME</span>
                   <button
                     className="conversion-place"
                     onClick={() => openSearch("home")}
@@ -371,11 +360,6 @@ function App() {
                     <ZoneLabel zone={home} instant={instant} />
                   </div>
                 </div>
-                <ArrowRight
-                  className="conversion-arrow"
-                  size={23}
-                  aria-hidden="true"
-                />
                 <div className="conversion-result">
                   <span className="clock-label">
                     {hover ? "HOVER PREVIEW" : "THEIR TIME"}
