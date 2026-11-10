@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   canonicalZone,
+  calendarDayDifference,
   differenceLabel,
   localInput,
   offsetMinutes,
@@ -8,9 +9,62 @@ import {
   solarPosition,
   utcLabel,
   clock,
+  timeZoneLabel,
 } from "./time";
 
 describe("time conversion", () => {
+  it("labels standard and daylight time for the requested date, not today's season", () => {
+    const winter = new Date("2026-01-15T12:00Z");
+    const summer = new Date("2026-07-15T12:00Z");
+    expect(timeZoneLabel("America/New_York", winter)).toMatchObject({
+      abbreviation: "EST",
+      offset: "UTC−5",
+    });
+    expect(timeZoneLabel("America/New_York", summer)).toMatchObject({
+      abbreviation: "EDT",
+      offset: "UTC−4",
+    });
+    expect(timeZoneLabel("Europe/Rome", winter)).toMatchObject({
+      abbreviation: "CET",
+      offset: "UTC+1",
+    });
+    expect(timeZoneLabel("Europe/Rome", summer)).toMatchObject({
+      abbreviation: "CEST",
+      offset: "UTC+2",
+    });
+    expect(timeZoneLabel("UTC", winter).abbreviation).toBe("UTC");
+    expect(timeZoneLabel("Asia/Tokyo", winter).abbreviation).toBe("JST");
+  });
+  it("disambiguates repeated abbreviations with an explicit UTC offset", () => {
+    const winter = new Date("2026-01-15T12:00Z");
+    expect(timeZoneLabel("Asia/Shanghai", winter)).toMatchObject({
+      abbreviation: "CST",
+      offset: "UTC+8",
+    });
+    expect(timeZoneLabel("America/Chicago", winter)).toMatchObject({
+      abbreviation: "CST",
+      offset: "UTC−6",
+    });
+  });
+  it("counts calendar date rollovers across month and year boundaries", () => {
+    const instant = new Date("2026-12-31T12:30Z");
+    expect(
+      calendarDayDifference("Pacific/Kiritimati", "Pacific/Pago_Pago", instant),
+    ).toBe(1);
+    expect(
+      calendarDayDifference("Pacific/Pago_Pago", "Pacific/Kiritimati", instant),
+    ).toBe(-1);
+    expect(calendarDayDifference("Europe/Paris", "Europe/Rome", instant)).toBe(
+      0,
+    );
+    expect(
+      calendarDayDifference(
+        "Pacific/Kiritimati",
+        "Etc/GMT+12",
+        new Date("2026-12-31T11:30Z"),
+      ),
+    ).toBe(2);
+  });
   it("matches historical aliases to current geographic zone names", () => {
     expect(canonicalZone("Asia/Kathmandu")).toBe(
       canonicalZone("Asia/Katmandu"),

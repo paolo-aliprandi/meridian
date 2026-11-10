@@ -1,9 +1,9 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import {
-  ArrowDown,
   ArrowRight,
   ArrowUpRight,
   Check,
+  CalendarClock,
   ChevronDown,
   Compass,
   Crosshair,
@@ -23,6 +23,7 @@ import tzlookup from "tz-lookup";
 import type { HoverZone } from "./Globe";
 import {
   cityName,
+  calendarDayDifference,
   clock,
   dateLabel,
   differenceLabel,
@@ -30,7 +31,7 @@ import {
   localInput,
   parseLocalInput,
   places,
-  utcLabel,
+  timeZoneLabel,
 } from "./time";
 
 const Globe = lazy(() => import("./Globe"));
@@ -54,6 +55,16 @@ const starStyles = Array.from({ length: 85 }, (_, i) => ({
 }));
 
 type SearchMode = "destination" | "home" | "add" | null;
+
+function ZoneLabel({ zone, instant }: { zone: string; instant: Date }) {
+  const { abbreviation, offset, name } = timeZoneLabel(zone, instant);
+  return (
+    <span className="timezone-label">
+      <abbr title={name}>{abbreviation}</abbr>
+      {abbreviation !== offset && <span>· {offset}</span>}
+    </span>
+  );
+}
 
 function App() {
   const [now, setNow] = useState(new Date());
@@ -87,6 +98,9 @@ function App() {
   const restoreFocus = useRef<HTMLElement | null>(null);
   const instant = customInstant ?? now;
   const destination = hover?.zone ?? selected;
+  const homeTime = timeError ? "--:--" : clock(instant, home);
+  const destinationTime = timeError ? "--:--" : clock(instant, destination);
+  const dayDifference = calendarDayDifference(destination, home, instant);
   const selectedPlace = places.find((place) => place.zone === selected);
   const matchingZones = supportedZones
     .filter((zone) =>
@@ -158,6 +172,19 @@ function App() {
   function openSearch(mode: SearchMode) {
     setQuery("");
     setSearchMode(mode);
+  }
+
+  function selectGlobeZone(zone: string) {
+    chooseZone(zone);
+    if (
+      !timeError &&
+      window.matchMedia("(hover: none) and (pointer: coarse)").matches
+    ) {
+      const { abbreviation, offset } = timeZoneLabel(zone, instant);
+      setNotice(
+        `${cityName(zone)}: ${clock(instant, zone)} ${abbreviation} (${offset}). ${differenceLabel(zone, home, instant)}.`,
+      );
+    }
   }
 
   function onSearchSelect(zone: string) {
@@ -232,7 +259,9 @@ function App() {
   }
 
   async function copyMoment() {
-    const text = `${dateLabel(instant, home)}, ${clock(instant, home)} in ${cityName(home)} = ${dateLabel(instant, selected)}, ${clock(instant, selected)} in ${cityName(selected)} (${utcLabel(selected, instant)}).`;
+    const homeLabel = timeZoneLabel(home, instant);
+    const destinationLabel = timeZoneLabel(selected, instant);
+    const text = `${dateLabel(instant, home)}, ${clock(instant, home)} ${homeLabel.abbreviation} (${homeLabel.offset}) in ${cityName(home)} = ${dateLabel(instant, selected)}, ${clock(instant, selected)} ${destinationLabel.abbreviation} (${destinationLabel.offset}) in ${cityName(selected)}.`;
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
@@ -271,9 +300,7 @@ function App() {
           </button>
         </nav>
         <div className="header-local">
-          <span className="live-dot" /> <span>YOUR LOCAL TIME</span>
-          <strong>{clock(now, home)}</strong>
-          <span className="local-zone">{utcLabel(home, now)}</span>
+          <span className="live-dot" /> LOCAL TIME. WORLDWIDE.
         </div>
       </header>
 
@@ -281,37 +308,171 @@ function App() {
         <section className="hero" id="explore" aria-labelledby="hero-heading">
           <div className="hero-copy">
             <div className="eyebrow">
-              <span className="tiny-orbit" /> A DIFFERENT PERSPECTIVE ON TIME
+              <span className="tiny-orbit" /> THE WORLD CLOCK, REIMAGINED
             </div>
             <h1 id="hero-heading">
-              One planet.
+              What time is it
               <br />
-              Countless
-              <br />
-              <span>moments.</span>
+              <span>over there?</span>
             </h1>
             <p className="hero-description">
-              Somewhere, the day is just beginning.
-              <br className="desktop-break" /> Somewhere else, the stars are
-              out.
-              <br className="desktop-break" /> Find your moment in between.
+              Your time, their time, and the difference. Instantly.
+              <br />
+              Choose a place or explore the globe.
             </p>
-            <button
-              className="locate-button"
-              onClick={locate}
-              disabled={locating}
+            <section
+              className={`moment-panel ${timeError ? "has-time-error" : ""}`}
+              aria-label="Time comparison"
             >
-              <LocateFixed size={16} className={locating ? "spin" : ""} />
-              {locating ? "Finding your place…" : "Find my place"}
-              <ArrowUpRight size={16} />
-            </button>
-            <div className="home-caption">
-              <span className="live-dot" />
-              Your time zone{" "}
-              <button onClick={() => openSearch("home")}>
-                {cityName(home)} <ChevronDown size={11} />
-              </button>
-            </div>
+              <div className="moment-heading">
+                <span className="micro-label">
+                  <span className="mini-line" /> YOUR WORLD, SIDE BY SIDE
+                </span>
+                <button
+                  className={`live-switch ${!customInstant && !timeError ? "is-live" : ""}`}
+                  onClick={() => {
+                    setCustomInstant(null);
+                    setInput("");
+                    setTimeError("");
+                  }}
+                  aria-label="Live"
+                  title={
+                    customInstant || timeError
+                      ? "Return to the current time"
+                      : "Showing current time"
+                  }
+                >
+                  <span className="live-dot" />
+                  {customInstant || timeError ? "BACK TO LIVE" : "LIVE"}
+                </button>
+              </div>
+              <div className="conversion-grid">
+                <div className="conversion-origin">
+                  <span className="clock-label">YOUR TIME</span>
+                  <button
+                    className="conversion-place"
+                    onClick={() => openSearch("home")}
+                    aria-label={`Change your time zone, ${cityName(home)}`}
+                  >
+                    <span>{cityName(home)}</span>
+                    <ChevronDown size={14} />
+                  </button>
+                  <time
+                    className="origin-time"
+                    dateTime={timeError ? undefined : instant.toISOString()}
+                    aria-label={`Your time ${homeTime}`}
+                  >
+                    {homeTime}
+                  </time>
+                  <span className="comparison-date">
+                    {dateLabel(instant, home)}
+                  </span>
+                  <div className="conversion-hint">
+                    <ZoneLabel zone={home} instant={instant} />
+                  </div>
+                </div>
+                <ArrowRight
+                  className="conversion-arrow"
+                  size={23}
+                  aria-hidden="true"
+                />
+                <div className="conversion-result">
+                  <span className="clock-label">
+                    {hover ? "HOVER PREVIEW" : "THEIR TIME"}
+                  </span>
+                  <button
+                    className="conversion-place"
+                    onClick={() => openSearch("destination")}
+                    aria-label={`Change destination, ${cityName(destination)}`}
+                  >
+                    <span>{cityName(destination)}</span>
+                    <ChevronDown size={14} />
+                  </button>
+                  <time
+                    className="result-time"
+                    dateTime={timeError ? undefined : instant.toISOString()}
+                    aria-label={`${cityName(destination)} time ${destinationTime}`}
+                  >
+                    {destinationTime}
+                  </time>
+                  <span className="comparison-date">
+                    {dateLabel(instant, destination)}
+                    {dayDifference !== 0 && (
+                      <span className="day-offset">
+                        {dayDifference > 0 ? "+" : "−"}
+                        {Math.abs(dayDifference)}{" "}
+                        {Math.abs(dayDifference) === 1 ? "day" : "days"}
+                      </span>
+                    )}
+                  </span>
+                  <div className="conversion-hint">
+                    <ZoneLabel zone={destination} instant={instant} />
+                  </div>
+                </div>
+              </div>
+              <div className="comparison-summary">
+                <span className="live-dot" />
+                <strong>
+                  {timeError
+                    ? "Choose a valid date & time"
+                    : differenceLabel(destination, home, instant)}
+                </strong>
+                <span className="comparison-context">
+                  {timeError
+                    ? ""
+                    : hover
+                      ? "Click globe to select"
+                      : "24-hour clock"}
+                </span>
+              </div>
+              <div className="time-editor">
+                <label htmlFor="moment-input">
+                  <CalendarClock size={16} /> Convert a time
+                </label>
+                <input
+                  id="moment-input"
+                  aria-label="Your date and time"
+                  type="datetime-local"
+                  value={
+                    customInstant || timeError
+                      ? input
+                      : localInput(instant, home)
+                  }
+                  onChange={(event) => changeTime(event.target.value)}
+                  aria-invalid={Boolean(timeError)}
+                  aria-describedby={
+                    timeError ? "time-error" : "time-editor-help"
+                  }
+                />
+              </div>
+              <span className="time-editor-help" id="time-editor-help">
+                Enter your local date & time. Both clocks update together.
+              </span>
+              {timeError && (
+                <p className="time-error" id="time-error" role="alert">
+                  {timeError}
+                </p>
+              )}
+              <div className="comparison-actions">
+                <button
+                  className="locate-button"
+                  onClick={locate}
+                  disabled={locating}
+                >
+                  <LocateFixed size={14} className={locating ? "spin" : ""} />
+                  {locating ? "Locating…" : "Find my place"}
+                </button>
+                <button
+                  className="share-button"
+                  onClick={copyMoment}
+                  aria-label="Copy converted time"
+                  disabled={Boolean(timeError)}
+                >
+                  {copied ? <Check size={14} /> : <ArrowUpRight size={14} />}
+                  {copied ? "Copied" : "Copy comparison"}
+                </button>
+              </div>
+            </section>
           </div>
 
           <div className="globe-stage">
@@ -332,7 +493,7 @@ function App() {
                 rotating={rotating}
                 focus={focus}
                 onHover={setHover}
-                onSelect={chooseZone}
+                onSelect={selectGlobeZone}
               />
             </Suspense>
             <div className="globe-topline">
@@ -374,118 +535,21 @@ function App() {
             </div>
             <div className="globe-instruction">
               <Compass size={14} />
-              <span>DRAG TO EXPLORE</span>
-              <span className="instruction-dot">·</span>
-              <span>SCROLL TO ZOOM</span>
-            </div>
-            <div className="zone-preview" aria-live="polite">
-              <span className="zone-preview-icon">
-                {isDaytime(instant, destination) ? (
-                  <Sun size={18} />
-                ) : (
-                  <Moon size={18} />
-                )}
+              <span className="mouse-instruction">
+                HOVER TO COMPARE<span className="instruction-dot"> · </span>
+                CLICK TO SELECT
               </span>
-              <div>
-                <span className="micro-label">
-                  {hover ? "EXPLORING" : "ON THE OTHER SIDE"}
-                </span>
-                <button onClick={() => openSearch("destination")}>
-                  {cityName(destination)} <ArrowUpRight size={15} />
-                </button>
-                <span className="zone-preview-detail">
-                  {differenceLabel(destination, home, instant)}
-                </span>
-              </div>
-              <strong>
-                {clock(instant, destination)}
-                <span>{utcLabel(destination, instant)}</span>
-              </strong>
+              <span className="touch-instruction">TAP A PLACE TO COMPARE</span>
             </div>
-          </div>
-
-          <div className="moment-panel">
-            <div className="moment-heading">
-              <span className="micro-label">
-                <span className="mini-line" /> FIND A SHARED MOMENT
+            <div className="globe-selection">
+              <span className="live-dot" />
+              <span className="mouse-instruction">
+                Drag to rotate · Scroll to zoom
               </span>
-              <button
-                className={`live-switch ${!customInstant ? "is-live" : ""}`}
-                onClick={() => {
-                  setCustomInstant(null);
-                  setInput("");
-                  setTimeError("");
-                }}
-              >
-                <span className="live-dot" /> LIVE
-              </button>
+              <span className="touch-instruction">
+                Drag to rotate · Pinch to zoom
+              </span>
             </div>
-            <div className="conversion-grid">
-              <div className="conversion-origin">
-                <button
-                  className="conversion-place"
-                  onClick={() => openSearch("home")}
-                >
-                  Your time <span>{cityName(home)}</span>
-                  <ChevronDown size={12} />
-                </button>
-                <input
-                  aria-label="Your date and time"
-                  type="datetime-local"
-                  value={input || localInput(instant, home)}
-                  onChange={(event) => changeTime(event.target.value)}
-                  aria-invalid={Boolean(timeError)}
-                  aria-describedby={timeError ? "time-error" : undefined}
-                />
-                <span className="conversion-hint">
-                  {utcLabel(home, instant)} <span>·</span>{" "}
-                  {customInstant
-                    ? "Custom date & time"
-                    : "Choose any date & time"}
-                </span>
-              </div>
-              <ArrowRight className="conversion-arrow" size={20} />
-              <div className="conversion-result">
-                <button
-                  className="conversion-place"
-                  onClick={() => openSearch("destination")}
-                >
-                  {cityName(selected)}
-                  <ChevronDown size={12} />
-                </button>
-                <div className="result-time">
-                  {clock(instant, selected)}
-                  <span>{dateLabel(instant, selected)}</span>
-                </div>
-                <span className="conversion-hint">
-                  {utcLabel(selected, instant)} <span>·</span>{" "}
-                  {differenceLabel(selected, home, instant)}
-                </span>
-              </div>
-              <button
-                className="share-button"
-                onClick={copyMoment}
-                aria-label="Copy converted time"
-                title="Copy this moment"
-              >
-                {copied ? <Check size={18} /> : <ArrowUpRight size={19} />}
-              </button>
-            </div>
-            {timeError && (
-              <p className="time-error" id="time-error" role="alert">
-                {timeError}
-              </p>
-            )}
-          </div>
-
-          <div className="hero-footnote">
-            <span className="sunset-swatch" />
-            <span>
-              Real sunlight. Real time zones.
-              <br />
-              One beautifully connected world.
-            </span>
-            <ArrowDown size={17} />
           </div>
         </section>
 
@@ -496,9 +560,9 @@ function App() {
         >
           <div className="section-heading">
             <div>
-              <span className="eyebrow">DISTANCE IS JUST A NUMBER</span>
+              <span className="eyebrow">MORE PLACES, AT A GLANCE</span>
               <h2 id="world-clock-heading">
-                Meanwhile, elsewhere<span>.</span>
+                Your world clock<span>.</span>
               </h2>
             </div>
             <button className="add-city" onClick={() => openSearch("add")}>
@@ -527,15 +591,12 @@ function App() {
                       </span>
                     </div>
                     <span className="clock-zone">
-                      {utcLabel(zone, instant)}
+                      <ZoneLabel zone={zone} instant={instant} />
                       <span className="card-selected-label">
                         {active ? "EXPLORING" : ""}
                       </span>
                     </span>
-                    <div className="city-time">
-                      {clock(instant, zone)}
-                      <span>{clock(instant, zone, true).slice(-2)}</span>
-                    </div>
+                    <div className="city-time">{clock(instant, zone)}</div>
                     <div className="clock-card-bottom">
                       <span>{dateLabel(instant, zone)}</span>
                       <span>
@@ -590,6 +651,7 @@ function App() {
           <span>
             {cityName(hover.zone)} <strong>{clock(instant, hover.zone)}</strong>
           </span>
+          <ZoneLabel zone={hover.zone} instant={instant} />
           <small>{differenceLabel(hover.zone, home, instant)}</small>
           <span className="hover-hint">CLICK TO KEEP THIS MOMENT</span>
         </div>
@@ -666,7 +728,7 @@ function App() {
                       </span>
                       <span>
                         {clock(instant, zone)}
-                        <small>{utcLabel(zone, instant)}</small>
+                        <ZoneLabel zone={zone} instant={instant} />
                       </span>
                       <ArrowUpRight size={15} />
                     </button>

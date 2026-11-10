@@ -5,6 +5,50 @@ export function canonicalZone(zone: string): string {
     .timeZone;
 }
 
+export function timeZoneLabel(zone: string, instant: Date) {
+  const name = new Intl.DateTimeFormat("en-US", {
+    timeZone: zone,
+    timeZoneName: "long",
+  })
+    .formatToParts(instant)
+    .find((part) => part.type === "timeZoneName")!.value;
+  const commonNames: Record<string, string> = {
+    "Japan Standard Time": "JST",
+    "India Standard Time": "IST",
+    "China Standard Time": "CST",
+    "Korean Standard Time": "KST",
+    "Singapore Standard Time": "SGT",
+    "Gulf Standard Time": "GST",
+    "Nepal Time": "NPT",
+  };
+  const shortNames = ["en-US", "en-GB", "en-AU"].map(
+    (locale) =>
+      new Intl.DateTimeFormat(locale, { timeZone: zone, timeZoneName: "short" })
+        .formatToParts(instant)
+        .find((part) => part.type === "timeZoneName")!.value,
+  );
+  const offset = utcLabel(zone, instant);
+  const abbreviation =
+    commonNames[name] ??
+    shortNames.find((short) => !/^(GMT|UTC)[+-]/.test(short)) ??
+    offset;
+  return { abbreviation, offset, name };
+}
+
+export function calendarDayDifference(
+  zone: string,
+  home: string,
+  instant: Date,
+): number {
+  const homeDate = Temporal.PlainDate.from(
+    localInput(instant, home).slice(0, 10),
+  );
+  const destinationDate = Temporal.PlainDate.from(
+    localInput(instant, zone).slice(0, 10),
+  );
+  return homeDate.until(destinationDate).days;
+}
+
 export function offsetMinutes(zone: string, instant: Date): number {
   return (
     Temporal.Instant.fromEpochMilliseconds(

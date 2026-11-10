@@ -31,6 +31,14 @@ rules come from the browser's IANA data; keep the browser current. The globe's
 terminator is astronomical. City card sun/moon icons use approximate local daytime
 (07:00–19:00), not local sunrise calculations.
 
+The primary comparison keeps both clocks, their date-specific abbreviations
+(EST/EDT, CET/CEST, etc.), UTC offsets, and the time difference together above the
+fold. Hovering previews a place in that same comparison; clicking selects it.
+Calendar-day badges make next/previous-day conversions explicit. Abbreviations
+expand to their full names on hover and always include the UTC offset to
+disambiguate labels such as CST. Where a short abbreviation is unavailable, the
+UTC offset is shown instead. Touch selections also announce the result on screen.
+
 ## Data and credits
 
 - Earth textures: NASA Visible Earth, distributed through the
