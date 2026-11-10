@@ -1,0 +1,187 @@
+import { expect, test, type Page } from "@playwright/test";
+
+async function selectZone(page: Page, zone: string) {
+  const search = page.getByRole("textbox", { name: "Search time zones" });
+  await search.fill(zone.replaceAll("_", " "));
+  await page
+    .locator(".zone-results button")
+    .filter({ hasText: zone.replaceAll("_", " ") })
+    .click();
+}
+
+test("desktop globe renders, rotates, hovers, selects, and toggles boundaries", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  await page.goto("./");
+  await expect(
+    page.getByRole("heading", { name: "One planet. Countless moments." }),
+  ).toBeVisible();
+  await expect(page.locator("canvas")).toBeVisible({ timeout: 20000 });
+  await expect(page.locator(".globe-status")).toHaveCount(0, {
+    timeout: 20000,
+  });
+  await page.getByRole("button", { name: "Pause rotation" }).click();
+  const canvas = await page.locator("canvas").boundingBox();
+  if (!canvas) throw new Error("Missing globe canvas");
+  await page.mouse.move(
+    canvas.x + canvas.width * 0.5,
+    canvas.y + canvas.height * 0.5,
+  );
+  await expect(page.locator(".hover-tooltip")).toBeVisible();
+  const hoveredZone = await page
+    .locator(".hover-tooltip > span")
+    .first()
+    .innerText();
+  expect(hoveredZone.length).toBeGreaterThan(5);
+  await page.mouse.click(
+    canvas.x + canvas.width * 0.5,
+    canvas.y + canvas.height * 0.5,
+  );
+  await expect(
+    page.locator(".conversion-result .conversion-place"),
+  ).not.toHaveText("Tokyo");
+  await page.mouse.move(
+    canvas.x + canvas.width * 0.5,
+    canvas.y + canvas.height * 0.5,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    canvas.x + canvas.width * 0.5 + 150,
+    canvas.y + canvas.height * 0.5 + 40,
+    { steps: 15 },
+  );
+  await page.mouse.up();
+  const boundaries = page.getByRole("button", {
+    name: "Toggle time-zone boundaries",
+  });
+  await boundaries.click();
+  await expect(boundaries).toHaveAttribute("aria-pressed", "false");
+  await boundaries.click();
+  await expect(boundaries).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Reset globe view" }).click();
+  await page.mouse.move(10, 10);
+  await page.waitForTimeout(1200);
+  await page.screenshot({
+    path: `${process.env.ARTIFACT_DIR || "test-results"}/meridian-desktop.png`,
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test("conversion respects fractional zones, date rollover, home changes and DST errors", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await page.locator(".conversion-result .conversion-place").click();
+  await selectZone(page, "Asia/Kathmandu");
+  await page.getByLabel("Your date and time").fill("2026-01-15T23:30");
+  await expect(page.locator(".result-time")).toContainText("04:15");
+  await expect(page.locator(".result-time")).toContainText("Fri 16 Jan");
+  await expect(
+    page.locator(".conversion-result .conversion-hint"),
+  ).toContainText("UTC+5:45");
+  await page.locator(".home-caption button").click();
+  await selectZone(page, "America/New_York");
+  await expect(page.getByLabel("Your date and time")).toHaveValue(
+    "2026-01-15T17:30",
+  );
+  await expect(page.locator(".result-time")).toContainText("04:15");
+  await page.getByLabel("Your date and time").fill("2026-11-01T01:30");
+  await expect(page.getByRole("alert")).toContainText("occurs twice");
+  await page.getByRole("button", { name: "LIVE", exact: true }).click();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect(page.locator(".live-switch")).toHaveClass(/is-live/);
+});
+
+test("search, favorites and dialog keyboard interaction work without a mouse globe", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await page.getByRole("button", { name: "Add a place" }).click();
+  await expect(
+    page.getByRole("textbox", { name: "Search time zones" }),
+  ).toBeFocused();
+  await selectZone(page, "Asia/Singapore");
+  await expect(
+    page.getByRole("button", { name: "Explore Singapore", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Remove Singapore" }).focus();
+  await page.keyboard.press("Enter");
+  await expect(
+    page.getByRole("button", { name: "Explore Singapore", exact: true }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "The perspective" }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "The perspective" }),
+  ).toBeFocused();
+});
+
+test("on-demand location sets the home zone without transmitting coordinates", async ({
+  page,
+  context,
+}) => {
+  await context.grantPermissions(["geolocation"]);
+  await context.setGeolocation({ latitude: 40.7128, longitude: -74.006 });
+  await page.goto("./");
+  await page.getByRole("button", { name: "Find my place" }).click();
+  await expect(page.locator(".home-caption")).toContainText("New York");
+  await expect(page.locator(".notice")).toContainText(
+    "Your location stays in your browser",
+  );
+});
+
+test("mobile is responsive and tapping the globe selects a time zone", async ({
+  browser,
+}) => {
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+    deviceScaleFactor: 2,
+    timezoneId: "Europe/Rome",
+    reducedMotion: "reduce",
+  });
+  const page = await context.newPage();
+  await page.goto("./");
+  await expect(page.locator("canvas")).toBeVisible({ timeout: 20000 });
+  await expect(page.locator(".globe-status")).toHaveCount(0, {
+    timeout: 20000,
+  });
+  await page.locator("canvas").tap({ position: { x: 190, y: 205 } });
+  await expect(
+    page.locator(".conversion-result .conversion-place"),
+  ).not.toHaveText("Tokyo");
+  await page.getByRole("button", { name: "Find my place" }).click();
+  await expect(page.locator(".notice")).toContainText(
+    "Location permission was declined",
+  );
+  await page.getByRole("button", { name: "Dismiss notification" }).click();
+  await expect(page.locator(".home-caption")).toContainText("Rome");
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: `${process.env.ARTIFACT_DIR || "test-results"}/meridian-mobile.png`,
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 320, height: 720 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await context.close();
+});
