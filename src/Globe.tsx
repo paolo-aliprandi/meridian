@@ -3,6 +3,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import tzlookup from "tz-lookup";
 import { canonicalZone, solarPosition } from "./time";
+import { zonesBetween, type ScreenPoint } from "./selection";
 
 type Coordinate = [number, number];
 type Feature = {
@@ -16,11 +17,13 @@ export type HoverZone = { zone: string; x: number; y: number } | null;
 type Props = {
   instant: Date;
   selectedZone: string;
+  selectedZones: string[];
   boundaries: boolean;
   rotating: boolean;
   focus: { lat: number; lon: number; key: number } | null;
   onHover: (hover: HoverZone) => void;
   onSelect: (zone: string) => void;
+  onRangeSelect: (zones: string[]) => void;
 };
 
 function vector(lat: number, lon: number, radius = 1): THREE.Vector3 {
@@ -80,6 +83,13 @@ export default function Globe(props: Props) {
   } | null>(null);
   const [status, setStatus] = useState("Loading our little blue planet");
   const [failed, setFailed] = useState(false);
+  const [borderReady, setBorderReady] = useState(false);
+  const [rangePreview, setRangePreview] = useState<{
+    start: ScreenPoint;
+    end: ScreenPoint;
+    count: number;
+    snapped: boolean;
+  } | null>(null);
   useEffect(() => {
     current.current = props;
   });
@@ -110,7 +120,7 @@ export default function Globe(props: Props) {
     container.appendChild(renderer.domElement);
     renderer.domElement.setAttribute(
       "aria-label",
-      "Interactive Earth. Drag to rotate, scroll to zoom, and tap a time zone to select it.",
+      "Interactive Earth. Drag a time-zone border to select multiple zones. Drag elsewhere to rotate, scroll to zoom, or tap a zone to select it.",
     );
     renderer.domElement.setAttribute("role", "img");
     const scene = new THREE.Scene();
@@ -223,6 +233,7 @@ export default function Globe(props: Props) {
     );
     linesGroup.add(graticule);
     let geography: Geography | null = null;
+    let timezoneLines: THREE.LineSegments | null = null;
     const featuresByZone = new Map<string, Feature>();
     const abort = new AbortController();
     fetch(`${import.meta.env.BASE_URL}timezones.geojson`, {
@@ -274,19 +285,18 @@ export default function Globe(props: Props) {
             }
           }
         }
-        linesGroup.add(
-          new THREE.LineSegments(
-            new THREE.BufferGeometry().setAttribute(
-              "position",
-              new THREE.Float32BufferAttribute(positions, 3),
-            ),
-            new THREE.LineBasicMaterial({
-              color: 0xc5f78b,
-              transparent: true,
-              opacity: 0.25,
-            }),
+        timezoneLines = new THREE.LineSegments(
+          new THREE.BufferGeometry().setAttribute(
+            "position",
+            new THREE.Float32BufferAttribute(positions, 3),
           ),
+          new THREE.LineBasicMaterial({
+            color: 0xc5f78b,
+            transparent: true,
+            opacity: 0.25,
+          }),
         );
+        linesGroup.add(timezoneLines);
       })
       .catch((error: unknown) => {
         if (
@@ -314,22 +324,135 @@ export default function Globe(props: Props) {
     let frame = 0;
     let pageVisible = !document.hidden;
     let viewportVisible = true;
-    const locate = (event: PointerEvent) => {
+    let range: {
+      start: ScreenPoint;
+      end: ScreenPoint;
+      pointerId: number;
+      zones: string[];
+      snapped: boolean;
+    } | null = null;
+    let nearBorder = false;
+    const earthSphere = new THREE.Sphere(new THREE.Vector3(), 1);
+    const spherePoint = new THREE.Vector3();
+    const zoneAliases = new Map<string, string>();
+    const locateAt = (position: ScreenPoint) => {
       const rect = renderer.domElement.getBoundingClientRect();
       pointer.set(
-        ((event.clientX - rect.left) / rect.width) * 2 - 1,
-        (-(event.clientY - rect.top) / rect.height) * 2 + 1,
+        ((position.x - rect.left) / rect.width) * 2 - 1,
+        (-(position.y - rect.top) / rect.height) * 2 + 1,
       );
       raycaster.setFromCamera(pointer, camera);
-      const hit = raycaster.intersectObject(earth)[0];
-      if (!hit) return null;
-      const point = hit.point.clone().normalize();
+      const point = raycaster.ray.intersectSphere(earthSphere, spherePoint);
+      if (!point) return null;
       const lat =
         (Math.asin(THREE.MathUtils.clamp(point.y, -1, 1)) * 180) / Math.PI;
       const lon = (Math.atan2(-point.z, point.x) * 180) / Math.PI;
-      return tzlookup(lat, lon);
+      const rawZone = tzlookup(lat, lon);
+      if (!zoneAliases.has(rawZone)) {
+        zoneAliases.set(
+          rawZone,
+          featuresByZone.get(canonicalZone(rawZone))?.properties.tzid ??
+            rawZone,
+        );
+      }
+      return zoneAliases.get(rawZone)!;
+    };
+    const locate = (event: PointerEvent) =>
+      locateAt({ x: event.clientX, y: event.clientY });
+    const borderAt = (position: ScreenPoint): ScreenPoint | null => {
+      if (!current.current.boundaries || !timezoneLines || !locateAt(position))
+        return null;
+      const rect = renderer.domElement.getBoundingClientRect();
+      // Keep the grab target in CSS pixels, independent of zoom and display density.
+      raycaster.params.Line.threshold =
+        (8 *
+          2 *
+          Math.tan((camera.fov * Math.PI) / 360) *
+          camera.position.length()) /
+        rect.height;
+      let closest: ScreenPoint | null = null;
+      let distance = 8;
+      for (const hit of raycaster.intersectObject(timezoneLines)) {
+        if (hit.point.dot(camera.position) <= hit.point.lengthSq()) continue;
+        const projected = hit.point.clone().project(camera);
+        const point = {
+          x: rect.left + ((projected.x + 1) * rect.width) / 2,
+          y: rect.top + ((1 - projected.y) * rect.height) / 2,
+        };
+        const pixels = Math.hypot(point.x - position.x, point.y - position.y);
+        if (pixels < distance) {
+          closest = point;
+          distance = pixels;
+        }
+      }
+      return closest;
+    };
+    const showPreview = () => {
+      if (!range) return;
+      const rect = renderer.domElement.getBoundingClientRect();
+      setRangePreview({
+        start: { x: range.start.x - rect.left, y: range.start.y - rect.top },
+        end: { x: range.end.x - rect.left, y: range.end.y - rect.top },
+        count: range.zones.length,
+        snapped: range.snapped,
+      });
+    };
+    const updateRange = (event: PointerEvent) => {
+      if (!range || event.pointerId !== range.pointerId) return;
+      const position = { x: event.clientX, y: event.clientY };
+      const snapped = borderAt(position);
+      if (!locateAt(position)) return;
+      range.end = snapped ?? position;
+      range.snapped = Boolean(snapped);
+      range.zones = zonesBetween(range.start, range.end, locateAt);
+      showPreview();
+    };
+    const finishRange = (commit: boolean) => {
+      if (!range) return;
+      const completed = range;
+      range = null;
+      if (renderer.domElement.hasPointerCapture(completed.pointerId))
+        renderer.domElement.releasePointerCapture(completed.pointerId);
+      controls.enabled = true;
+      dragging = false;
+      nearBorder = false;
+      hover = null;
+      current.current.onHover(null);
+      setBorderReady(false);
+      setRangePreview(null);
+      renderer.domElement.style.cursor = "grab";
+      lastInteraction = performance.now();
+      if (
+        commit &&
+        Math.hypot(
+          completed.end.x - completed.start.x,
+          completed.end.y - completed.start.y,
+        ) >= 6 &&
+        completed.zones.length
+      ) {
+        current.current.onRangeSelect(completed.zones);
+      } else if (
+        commit &&
+        Math.hypot(
+          completed.end.x - completed.start.x,
+          completed.end.y - completed.start.y,
+        ) < 6
+      ) {
+        const zone = locateAt(completed.end);
+        if (zone) current.current.onSelect(zone);
+      }
     };
     const onDown = (event: PointerEvent) => {
+      if (range) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        return;
+      }
+      if (event.button !== 0 || !event.isPrimary) return;
+      const start =
+        event.pointerType === "touch"
+          ? null
+          : borderAt({ x: event.clientX, y: event.clientY });
       dragging = true;
       downX = event.clientX;
       downY = event.clientY;
@@ -338,16 +461,50 @@ export default function Globe(props: Props) {
       target = null;
       hover = null;
       current.current.onHover(null);
+      if (start) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        controls.enabled = false;
+        controls.autoRotate = false;
+        range = {
+          start,
+          end: start,
+          pointerId: event.pointerId,
+          zones: [],
+          snapped: true,
+        };
+        renderer.domElement.setPointerCapture(event.pointerId);
+        renderer.domElement.style.cursor = "ew-resize";
+        setBorderReady(false);
+        showPreview();
+      }
     };
     const onMove = (event: PointerEvent) => {
+      if (range) {
+        updateRange(event);
+        return;
+      }
       if (dragging || event.pointerType === "touch") return;
+      nearBorder = Boolean(borderAt({ x: event.clientX, y: event.clientY }));
+      setBorderReady(nearBorder);
       hover = locate(event);
-      renderer.domElement.style.cursor = hover ? "grab" : "default";
+      renderer.domElement.style.cursor = nearBorder
+        ? "ew-resize"
+        : hover
+          ? "grab"
+          : "default";
       current.current.onHover(
         hover ? { zone: hover, x: event.clientX, y: event.clientY } : null,
       );
     };
     const onUp = (event: PointerEvent) => {
+      if (range) {
+        if (event.pointerId === range.pointerId) {
+          updateRange(event);
+          finishRange(Boolean(locate(event)));
+        }
+        return;
+      }
       if (
         dragging &&
         Math.hypot(event.clientX - downX, event.clientY - downY) < 6 &&
@@ -360,18 +517,36 @@ export default function Globe(props: Props) {
       lastInteraction = performance.now();
     };
     const onLeave = () => {
+      if (range) return;
+      nearBorder = false;
+      setBorderReady(false);
       hover = null;
       current.current.onHover(null);
     };
     const onWheel = () => {
+      finishRange(false);
       target = null;
       lastInteraction = performance.now();
     };
-    renderer.domElement.addEventListener("pointerdown", onDown);
+    const onCancel = () => {
+      finishRange(false);
+      dragging = false;
+    };
+    const onLostCapture = () => {
+      if (range) finishRange(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") finishRange(false);
+    };
+    renderer.domElement.addEventListener("pointerdown", onDown, true);
     renderer.domElement.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
     renderer.domElement.addEventListener("pointerleave", onLeave);
     renderer.domElement.addEventListener("wheel", onWheel, { passive: true });
+    renderer.domElement.addEventListener("pointercancel", onCancel);
+    renderer.domElement.addEventListener("lostpointercapture", onLostCapture);
+    window.addEventListener("blur", onCancel);
+    window.addEventListener("keydown", onKey);
 
     const resize = new ResizeObserver(() => {
       const { width, height } = container.getBoundingClientRect();
@@ -412,13 +587,23 @@ export default function Globe(props: Props) {
           vector(sun.latitude, sun.longitude),
         );
       }
-      const selected = hover ?? state.selectedZone;
-      if (geography && selectionKey !== selected) {
-        selectionKey = selected;
+      if (range && !state.boundaries) finishRange(false);
+      if (nearBorder && !state.boundaries) {
+        nearBorder = false;
+        setBorderReady(false);
+        renderer.domElement.style.cursor = hover ? "grab" : "default";
+      }
+      const selected = range
+        ? range.zones
+        : [...state.selectedZones, hover ?? state.selectedZone];
+      const nextSelectionKey = selected.join("|");
+      if (geography && selectionKey !== nextSelectionKey) {
+        selectionKey = nextSelectionKey;
         context.clearRect(0, 0, 2048, 1024);
         context.fillStyle = "white";
-        const feature = featuresByZone.get(canonicalZone(selected));
-        if (feature) {
+        for (const zone of new Set(selected)) {
+          const feature = featuresByZone.get(canonicalZone(zone));
+          if (!feature) continue;
           const polygons =
             feature.geometry.type === "Polygon"
               ? [feature.geometry.coordinates]
@@ -444,6 +629,7 @@ export default function Globe(props: Props) {
         state.rotating &&
         !reducedMotion.matches &&
         !hover &&
+        !nearBorder &&
         !dragging &&
         !target &&
         performance.now() - lastInteraction > 4000;
@@ -451,7 +637,7 @@ export default function Globe(props: Props) {
         camera.position.lerp(target, reducedMotion.matches ? 1 : 0.055);
         if (camera.position.distanceTo(target) < 0.002) target = null;
       }
-      controls.update();
+      if (!range) controls.update();
       renderer.render(scene, camera);
     }
     animate();
@@ -472,10 +658,17 @@ export default function Globe(props: Props) {
       controls.dispose();
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pointerup", onUp);
-      renderer.domElement.removeEventListener("pointerdown", onDown);
+      renderer.domElement.removeEventListener("pointerdown", onDown, true);
       renderer.domElement.removeEventListener("pointermove", onMove);
       renderer.domElement.removeEventListener("pointerleave", onLeave);
       renderer.domElement.removeEventListener("wheel", onWheel);
+      renderer.domElement.removeEventListener("pointercancel", onCancel);
+      renderer.domElement.removeEventListener(
+        "lostpointercapture",
+        onLostCapture,
+      );
+      window.removeEventListener("blur", onCancel);
+      window.removeEventListener("keydown", onKey);
       renderer.domElement.removeEventListener(
         "webglcontextlost",
         onContextLost,
@@ -502,6 +695,29 @@ export default function Globe(props: Props) {
   return (
     <div className={`globe-surface ${failed ? "globe-failed" : ""}`}>
       <div className="globe-canvas" ref={mount} />
+      {rangePreview && (
+        <svg className="range-overlay" aria-hidden="true">
+          <line
+            x1={rangePreview.start.x}
+            y1={rangePreview.start.y}
+            x2={rangePreview.end.x}
+            y2={rangePreview.end.y}
+          />
+          <circle cx={rangePreview.start.x} cy={rangePreview.start.y} r="5" />
+          <circle
+            cx={rangePreview.end.x}
+            cy={rangePreview.end.y}
+            r={rangePreview.snapped ? "7" : "5"}
+          />
+        </svg>
+      )}
+      {(borderReady || rangePreview) && (
+        <div className="border-drag-hint" role="status">
+          {rangePreview
+            ? `${rangePreview.count} zones · ${rangePreview.snapped ? "snapped to border" : "drag to another border"} · Esc to cancel`
+            : "Drag this border to select time zones"}
+        </div>
+      )}
       {status ? (
         <div className="globe-status" role="status">
           {!failed && <span className="loading-orbit" />}

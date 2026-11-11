@@ -385,6 +385,52 @@ a svg {
   white-space: nowrap;
   z-index: 3;
 }
+.globe-selection a,
+.globe-selection button {
+  color: var(--lime);
+  font: inherit;
+  padding: 4px;
+}
+.range-result {
+  color: #d3ddce;
+}
+.range-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;
+  overflow: visible;
+}
+.range-overlay line {
+  stroke: var(--lime);
+  stroke-width: 2;
+  stroke-dasharray: 4 5;
+}
+.range-overlay circle {
+  stroke: var(--lime);
+  stroke-width: 2;
+  fill: #10191b;
+}
+.border-drag-hint {
+  position: absolute;
+  top: 54px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 32px);
+  padding: 8px 12px;
+  border: 1px solid #c5f78b40;
+  border-radius: 6px;
+  background: #10191bef;
+  color: var(--lime);
+  font-size: 11px;
+  line-height: 1.5;
+  text-align: center;
+  pointer-events: none;
+  z-index: 4;
+}
 .micro-label {
   font-size: 8px;
   letter-spacing: 1.35px;

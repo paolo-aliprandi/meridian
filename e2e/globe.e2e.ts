@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { PerspectiveCamera, Vector3 } from "three";
 
 async function selectZone(page: Page, zone: string) {
   const search = page.getByRole("textbox", { name: "Search time zones" });
@@ -8,6 +9,143 @@ async function selectZone(page: Page, zone: string) {
     .filter({ hasText: zone.replaceAll("_", " ") })
     .click();
 }
+
+async function prepareBorderDrag(page: Page) {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const outlines = page.waitForResponse((response) =>
+    response.url().endsWith("/timezones.geojson"),
+  );
+  await page.goto("./");
+  await outlines;
+  await expect(page.locator(".globe-status")).toHaveCount(0, {
+    timeout: 20000,
+  });
+  await page.getByRole("button", { name: "Pause rotation" }).click();
+  await page.getByRole("button", { name: "Reset globe view" }).click();
+  const rect = await page.locator("canvas").boundingBox();
+  if (!rect) throw new Error("Missing globe canvas");
+  const vector = (lat: number, lon: number, radius: number) =>
+    new Vector3(
+      radius *
+        Math.cos((lat * Math.PI) / 180) *
+        Math.cos((lon * Math.PI) / 180),
+      radius * Math.sin((lat * Math.PI) / 180),
+      -radius *
+        Math.cos((lat * Math.PI) / 180) *
+        Math.sin((lon * Math.PI) / 180),
+    );
+  const camera = new PerspectiveCamera(36, rect.width / rect.height, 0.1, 100);
+  camera.position.copy(vector(23, 24, 3.55));
+  camera.lookAt(0, 0, 0);
+  camera.updateMatrixWorld();
+  return async (lat: number, lon: number) => {
+    const projected = vector(lat, lon, 1.004).project(camera);
+    await page.mouse.move(
+      rect.x + ((projected.x + 1) * rect.width) / 2,
+      rect.y + ((1 - projected.y) * rect.height) / 2,
+    );
+  };
+}
+
+test("border dragging previews, shrinks, reverses and compares selected zones", async ({
+  page,
+}) => {
+  const move = await prepareBorderDrag(page);
+  const hint = page.locator(".border-drag-hint");
+  // Visible borders across northern Africa, in the initial globe view.
+  await move(25, -5);
+  await expect(page.locator("canvas")).toHaveCSS("cursor", "ew-resize");
+  await expect(hint).toHaveText("Drag this border to select time zones");
+  await page.mouse.down();
+  await move(25, 25);
+  await expect(hint).toContainText("snapped to border");
+  const count = Number((await hint.innerText()).match(/^\d+/)![0]);
+  expect(count).toBeGreaterThan(1);
+  const anchor = await page
+    .locator(".range-overlay circle")
+    .first()
+    .getAttribute("cx");
+  await move(28, 10);
+  await expect(hint).toContainText("snapped to border");
+  expect(Number((await hint.innerText()).match(/^\d+/)![0])).toBeLessThan(
+    count,
+  );
+  await move(25, 25);
+  await expect(page.locator(".range-overlay circle").first()).toHaveAttribute(
+    "cx",
+    anchor!,
+  );
+  await page.mouse.up();
+  await expect(page.locator(".range-overlay")).toHaveCount(0);
+  await expect(page.locator(".clock-card")).toHaveCount(count);
+  const cities = await page.locator(".clock-city").allTextContents();
+  expect(cities).toEqual(expect.arrayContaining(["Algiers", "Tripoli"]));
+  expect(cities).not.toContain("Tokyo");
+  await page.getByLabel("Your date and time").fill("2026-01-15T12:00");
+  await expect(page.locator(".working-status.is-working")).toHaveCount(count);
+  await expect(page.locator(".range-result")).toHaveText(
+    `${count} zones · ${count} in 9–5`,
+  );
+  await move(25, 25);
+  await page.mouse.down();
+  await move(25, -5);
+  await page.mouse.up();
+  await expect(page.locator(".clock-card")).toHaveCount(count);
+  expect((await page.locator(".clock-city").allTextContents()).sort()).toEqual(
+    cities.sort(),
+  );
+  await page.getByRole("button", { name: "Clear zone selection" }).click();
+  await expect(page.locator(".clock-card")).toHaveCount(0);
+  await expect(page.locator(".range-result")).toHaveCount(0);
+});
+
+test("border selection cancels cleanly and leaves ordinary rotation available", async ({
+  page,
+}) => {
+  const move = await prepareBorderDrag(page);
+  for (const cancel of ["escape", "pointercancel", "outside"]) {
+    await move(25, -5);
+    await page.mouse.down();
+    await move(25, 25);
+    await expect(page.locator(".range-overlay")).toBeVisible();
+    if (cancel === "escape") await page.keyboard.press("Escape");
+    else if (cancel === "pointercancel")
+      await page.locator("canvas").dispatchEvent("pointercancel");
+    else await page.mouse.move(10, 10);
+    await page.mouse.up();
+    await expect(page.locator(".range-overlay")).toHaveCount(0);
+    await expect(page.locator(".clock-card")).toHaveCount(4);
+    await expect(page.locator(".range-result")).toHaveCount(0);
+  }
+  await page
+    .getByRole("button", { name: "Toggle time-zone boundaries" })
+    .click();
+  await move(25, -5);
+  await expect(page.locator("canvas")).toHaveCSS("cursor", "grab");
+  await expect(page.locator(".border-drag-hint")).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Toggle time-zone boundaries" })
+    .click();
+  await move(25, 0);
+  await expect(page.locator("canvas")).toHaveCSS("cursor", "grab");
+  const before = await page
+    .locator(".hover-tooltip > span")
+    .first()
+    .innerText();
+  await page.mouse.down();
+  // A normal drag away from a border must still rotate, not select zones.
+  await page.mouse.move(1050, 440, { steps: 10 });
+  await page.mouse.up();
+  await page.mouse.move(10, 10);
+  await page.waitForTimeout(1000);
+  await move(25, 0);
+  await expect(page.locator(".hover-tooltip > span").first()).not.toHaveText(
+    before,
+  );
+  await expect(page.locator(".clock-card")).toHaveCount(4);
+  await expect(page.locator(".range-result")).toHaveCount(0);
+});
 
 test("search metadata, sitemap and social preview are served without JavaScript", async ({
   browser,

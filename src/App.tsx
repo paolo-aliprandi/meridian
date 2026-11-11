@@ -92,6 +92,7 @@ function App() {
     "Asia/Tokyo",
     "Australia/Sydney",
   ]);
+  const [rangeSelected, setRangeSelected] = useState(false);
   const [copied, setCopied] = useState(false);
   const searchInput = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -190,6 +191,20 @@ function App() {
     }
   }
 
+  function selectGlobeRange(zones: string[]) {
+    setFavorites(zones);
+    setRangeSelected(true);
+    setSelected(zones[zones.length - 1]);
+    setHover(null);
+    setRotating(false);
+    const working = zones.filter((zone) => isWorkingTime(instant, zone)).length;
+    setNotice(
+      timeError
+        ? `${zones.length} zones selected. Fix the date and time to check 9–5.`
+        : `${zones.length} zones selected · ${working} within 9–5 ${customInstant ? "at your chosen time" : "now"}.`,
+    );
+  }
+
   function onSearchSelect(zone: string) {
     if (searchMode === "home") {
       setHome(zone);
@@ -198,10 +213,6 @@ function App() {
     } else if (searchMode === "add") {
       if (favorites.includes(zone))
         setNotice(`${cityName(zone)} is already in your world clock.`);
-      else if (favorites.length >= 8)
-        setNotice(
-          "Your world clock has room for 8 places. Remove a place first.",
-        );
       else setFavorites((previous) => [...previous, zone]);
       chooseZone(zone);
     } else chooseZone(zone);
@@ -477,11 +488,13 @@ function App() {
               <Globe
                 instant={instant}
                 selectedZone={selected}
+                selectedZones={rangeSelected ? favorites : []}
                 boundaries={boundaries}
                 rotating={rotating}
                 focus={focus}
                 onHover={setHover}
                 onSelect={selectGlobeZone}
+                onRangeSelect={selectGlobeRange}
               />
             </Suspense>
             <div className="globe-topline">
@@ -524,19 +537,41 @@ function App() {
             <div className="globe-instruction">
               <Compass size={14} />
               <span className="mouse-instruction">
-                HOVER TO COMPARE<span className="instruction-dot"> · </span>
-                CLICK TO SELECT
+                DRAG A BORDER TO SELECT ZONES
               </span>
               <span className="touch-instruction">TAP A PLACE TO COMPARE</span>
             </div>
             <div className="globe-selection">
-              <span className="live-dot" />
-              <span className="mouse-instruction">
-                Drag to rotate · Scroll to zoom
-              </span>
-              <span className="touch-instruction">
-                Drag to rotate · Pinch to zoom
-              </span>
+              {rangeSelected ? (
+                <>
+                  <span className="range-result" role="status">
+                    {favorites.length} zones ·{" "}
+                    {timeError
+                      ? "Fix time to check 9–5"
+                      : `${workingCount} in 9–5`}
+                  </span>
+                  <a href="#world-clock">Compare ↓</a>
+                  <button
+                    aria-label="Clear zone selection"
+                    onClick={() => {
+                      setRangeSelected(false);
+                      setFavorites([]);
+                    }}
+                  >
+                    Clear
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="live-dot" />
+                  <span className="mouse-instruction">
+                    Drag elsewhere to rotate · Scroll to zoom
+                  </span>
+                  <span className="touch-instruction">
+                    Drag to rotate · Pinch to zoom
+                  </span>
+                </>
+              )}
             </div>
           </div>
         </section>

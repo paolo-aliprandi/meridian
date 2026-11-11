@@ -46,6 +46,14 @@ The rule is 09:00 inclusive to 17:00 exclusive in each place's local time,
 every day (not a weekday/holiday calendar). Statuses follow live time or the
 date and time entered in the converter, including daylight-saving changes.
 
+On desktop, move within 8 pixels of a visible time-zone border: the cursor changes
+to a selection cursor. Drag to another border to highlight the zones along the
+interval and replace the comparison cards with those zones. The endpoint snaps
+to nearby borders; moving it back shrinks the selection. This follows the actual
+geographic zones crossed, not 24 equal longitude slices or every region sharing
+an offset. Release to compare; Escape cancels. Dragging away from borders still
+rotates the globe. Touch and keyboard users can select places with **Add a place**.
+
 ## Data and credits
 
 - Earth textures: NASA Visible Earth, distributed through the
