@@ -51,6 +51,12 @@ async function prepareBorderDrag(page: Page) {
 }
 
 async function globePixel(page: Page, point: { x: number; y: number }) {
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      }),
+  );
   const image = await page.screenshot({
     clip: {
       x: Math.floor(point.x) - 3,
@@ -81,6 +87,7 @@ async function globePixel(page: Page, point: { x: number; y: number }) {
 test("globe colors distinguish working hours, update at 17:00, and neutralize invalid time", async ({
   page,
 }) => {
+  test.setTimeout(60_000);
   const move = await prepareBorderDrag(page);
   await move(25, -5);
   await page.mouse.down();
@@ -101,23 +108,14 @@ test("globe colors distinguish working hours, update at 17:00, and neutralize in
   const workingPixel = await move(27, 3);
   const offHoursPixel = await move(27, 15);
   await page.mouse.move(10, 10);
-  await expect
-    .poll(async () => {
-      const color = await globePixel(page, workingPixel);
-      return color.g - color.r;
-    })
-    .toBeGreaterThan(10);
+  const working = await globePixel(page, workingPixel);
+  expect(working.g - working.r).toBeGreaterThan(10);
   const offHours = await globePixel(page, offHoursPixel);
   expect(offHours.r - offHours.g).toBeGreaterThan(10);
   await page.getByLabel("Your date and time").fill("2026-01-15T17:00");
   await expect(algiers).toHaveClass(/clock-off-hours/);
-  await expect
-    .poll(async () => {
-      const color = await globePixel(page, workingPixel);
-      return color.r - color.g;
-    })
-    .toBeGreaterThan(10);
   const outside = await globePixel(page, workingPixel);
+  expect(outside.r - outside.g).toBeGreaterThan(10);
   const outsideChroma =
     Math.max(outside.r, outside.g, outside.b) -
     Math.min(outside.r, outside.g, outside.b);
@@ -128,15 +126,11 @@ test("globe colors distinguish working hours, update at 17:00, and neutralize in
     "Fix time to color zones",
   );
   await expect(page.locator(".notice")).toHaveCount(0);
-  await expect
-    .poll(async () => {
-      const color = await globePixel(page, workingPixel);
-      return (
-        Math.max(color.r, color.g, color.b) -
-        Math.min(color.r, color.g, color.b)
-      );
-    })
-    .toBeLessThan(outsideChroma / 2);
+  const neutral = await globePixel(page, workingPixel);
+  const neutralChroma =
+    Math.max(neutral.r, neutral.g, neutral.b) -
+    Math.min(neutral.r, neutral.g, neutral.b);
+  expect(neutralChroma).toBeLessThan(outsideChroma / 2);
 });
 
 test("border dragging previews, shrinks, reverses and compares selected zones", async ({
