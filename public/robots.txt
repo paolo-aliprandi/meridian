@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /meridian/
+
+Sitemap: https://paolo-aliprandi.github.io/meridian/sitemap.xml

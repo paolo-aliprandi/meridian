@@ -9,6 +9,62 @@ async function selectZone(page: Page, zone: string) {
     .click();
 }
 
+test("search metadata, sitemap and social preview are served without JavaScript", async ({
+  browser,
+  baseURL,
+}) => {
+  const context = await browser.newContext({ javaScriptEnabled: false });
+  const page = await context.newPage();
+  await page.goto(baseURL!);
+  const canonical = "https://paolo-aliprandi.github.io/meridian/";
+  await expect(page.locator("link[rel=canonical]")).toHaveAttribute(
+    "href",
+    canonical,
+  );
+  await expect(page.locator("meta[name=robots]")).toHaveAttribute(
+    "content",
+    /index, follow/,
+  );
+  await expect(page.locator("meta[property='og:url']")).toHaveAttribute(
+    "content",
+    canonical,
+  );
+  await page
+    .getByText("World clock, time zone converter & 9–5 checker", {
+      exact: true,
+    })
+    .click();
+  await expect(page.locator(".site-description")).toContainText("09:00–17:00");
+  await expect(page.locator("noscript p")).toBeVisible();
+  expect(await page.locator("noscript p").textContent()).toContain(
+    "Enable JavaScript",
+  );
+  const structuredData = JSON.parse(
+    (await page.locator("script[type='application/ld+json']").textContent())!,
+  );
+  expect(structuredData["@type"]).toBe("WebApplication");
+  expect(structuredData.url).toBe(canonical);
+  const sitemap = await page.request.get(new URL("sitemap.xml", baseURL!).href);
+  expect(sitemap.status()).toBe(200);
+  expect(await sitemap.text()).toContain(`<loc>${canonical}</loc>`);
+  const robots = await page.request.get(new URL("robots.txt", baseURL!).href);
+  expect(robots.status()).toBe(200);
+  expect(await robots.text()).toContain(`${canonical}sitemap.xml`);
+  const previewURL = await page
+    .locator("meta[property='og:image']")
+    .getAttribute("content");
+  expect(previewURL).toBe(`${canonical}social-preview.png`);
+  const preview = await page.request.get(
+    new URL("social-preview.png", baseURL!).href,
+  );
+  expect(preview.status()).toBe(200);
+  expect(preview.headers()["content-type"]).toContain("image/png");
+  const image = await preview.body();
+  expect(image.readUInt32BE(16)).toBe(1200);
+  expect(image.readUInt32BE(20)).toBe(630);
+  await context.close();
+});
+
 test("desktop globe renders, rotates, hovers, selects, and toggles boundaries", async ({
   page,
 }) => {

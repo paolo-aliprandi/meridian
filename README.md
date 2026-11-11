@@ -80,3 +80,16 @@ or legal boundary determinations.
 Pushes to `main` run lint, tests and a production build, then deploy to GitHub Pages
 using GitHub Actions. No API keys, backend, paid service, or private credentials are
 required.
+
+## Search and sharing
+
+The production HTML includes a canonical URL, indexable product description,
+Open Graph/Twitter preview metadata and WebApplication structured data.
+`public/social-preview.png` is a screenshot of Meridian, not an external image.
+The sitemap is at https://paolo-aliprandi.github.io/meridian/sitemap.xml.
+
+On GitHub Pages project sites, `/meridian/robots.txt` is not the host-level
+`/robots.txt` used by crawlers. The page itself explicitly permits indexing via
+its robots meta tag; host-level crawler rules remain controlled by the parent
+site. Submit the sitemap in Google Search Console for discovery; metadata does
+not guarantee indexing, rich results or rankings.

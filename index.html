@@ -6,8 +6,75 @@
     <meta name="theme-color" content="#050709" />
     <meta
       name="description"
-      content="Compare your time with anywhere on Earth. Live world clocks, clear UTC offsets, daylight-saving labels, and date-aware time conversion on an interactive 3D globe."
+      content="Compare world times, convert time zones, and see which places are working 9–5. Explore a live 3D Earth with clear UTC offsets and daylight-saving labels."
     />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <link rel="canonical" href="https://paolo-aliprandi.github.io/meridian/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Meridian" />
+    <meta property="og:locale" content="en_GB" />
+    <meta
+      property="og:title"
+      content="Meridian — World Clock &amp; Time Zone Converter"
+    />
+    <meta
+      property="og:description"
+      content="Your time, their time, and who's in their 9–5. Compare time zones on an interactive 3D Earth."
+    />
+    <meta
+      property="og:url"
+      content="https://paolo-aliprandi.github.io/meridian/"
+    />
+    <meta
+      property="og:image"
+      content="https://paolo-aliprandi.github.io/meridian/social-preview.png"
+    />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="Meridian's large digital time, destination time, and interactive Earth with day and night illumination."
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:title"
+      content="Meridian — World Clock &amp; Time Zone Converter"
+    />
+    <meta
+      name="twitter:description"
+      content="Compare time zones and find who's working 9–5 on a live 3D globe."
+    />
+    <meta
+      name="twitter:image"
+      content="https://paolo-aliprandi.github.io/meridian/social-preview.png"
+    />
+    <meta
+      name="twitter:image:alt"
+      content="Meridian world clock with a large digital time and illuminated 3D Earth."
+    />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "@id": "https://paolo-aliprandi.github.io/meridian/#app",
+        "name": "Meridian",
+        "url": "https://paolo-aliprandi.github.io/meridian/",
+        "description": "A world clock, time zone converter, and 9-to-5 working-hours checker with an interactive 3D Earth.",
+        "applicationCategory": "UtilitiesApplication",
+        "operatingSystem": "Any",
+        "browserRequirements": "JavaScript enabled. WebGL required for the interactive globe.",
+        "inLanguage": "en",
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "featureList": [
+          "Live world clocks with UTC offsets and daylight-saving labels",
+          "Date-aware time zone conversion",
+          "9-to-5 working-hours comparison across selected places",
+          "Interactive 3D Earth with day and night illumination"
+        ],
+        "image": "https://paolo-aliprandi.github.io/meridian/social-preview.png"
+      }
+    </script>
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
     <title>Meridian — World Clock &amp; Time Zone Converter</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -19,6 +86,35 @@
   </head>
   <body>
     <div id="root"></div>
+    <section class="site-description" aria-label="About Meridian">
+      <details>
+        <summary>World clock, time zone converter &amp; 9–5 checker</summary>
+        <p>
+          Meridian is a free world clock and time zone converter. Compare local
+          times in different cities, see UTC offsets and daylight-saving
+          abbreviations such as EST, EDT, CET and CEST, or enter a date and time
+          to plan ahead.
+        </p>
+        <p>
+          Add places to check which are within 09:00–17:00 local time.
+          Working-hours labels update with live time or your chosen moment. The
+          simple 9–5 rule applies every day and does not account for weekends,
+          holidays or individual schedules.
+        </p>
+        <p>
+          Rotate the interactive 3D Earth to explore time zones, sunlight,
+          twilight and city lights. Meridian works on desktop and mobile,
+          without an account. Location access is optional and processed in your
+          browser.
+        </p>
+        <noscript
+          ><p>
+            Enable JavaScript to use the live times, converter and working-hours
+            checker. The 3D globe also requires WebGL.
+          </p></noscript
+        >
+      </details>
+    </section>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
