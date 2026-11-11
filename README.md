@@ -40,6 +40,12 @@ expand to their full names on hover and always include the UTC offset to
 disambiguate labels such as CST. Where a short abbreviation is unavailable, the
 UTC offset is shown instead. Touch selections also announce the result on screen.
 
+Use **Add a place** to compare working hours across time zones. Each selected
+place shows **Working · 9–5** or **Outside 9–5**, with a count above the cards.
+The rule is 09:00 inclusive to 17:00 exclusive in each place's local time,
+every day (not a weekday/holiday calendar). Statuses follow live time or the
+date and time entered in the converter, including daylight-saving changes.
+
 ## Data and credits
 
 - Earth textures: NASA Visible Earth, distributed through the

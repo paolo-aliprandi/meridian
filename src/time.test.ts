@@ -10,6 +10,7 @@ import {
   utcLabel,
   clock,
   timeZoneLabel,
+  isWorkingTime,
 } from "./time";
 
 describe("time conversion", () => {
@@ -105,6 +106,45 @@ describe("time conversion", () => {
       parseLocalInput("2026-11-01T01:30", "America/New_York"),
     ).toThrow();
     expect(() => parseLocalInput("", "Europe/Rome")).toThrow();
+  });
+});
+
+describe("working hours", () => {
+  it.each([
+    ["2026-01-15T07:59:59Z", false],
+    ["2026-01-15T08:00:00Z", true],
+    ["2026-01-15T15:59:59Z", true],
+    ["2026-01-15T16:00:00Z", false],
+  ])(
+    "checks 09:00 inclusive and 17:00 exclusive in the local zone: %s",
+    (value, expected) => {
+      expect(isWorkingTime(new Date(value), "Europe/Rome")).toBe(expected);
+    },
+  );
+  it("uses the chosen date's DST rules and fractional offsets", () => {
+    expect(
+      isWorkingTime(new Date("2026-01-15T13:00Z"), "America/New_York"),
+    ).toBe(false);
+    expect(
+      isWorkingTime(new Date("2026-07-15T13:00Z"), "America/New_York"),
+    ).toBe(true);
+    expect(isWorkingTime(new Date("2026-01-15T03:14Z"), "Asia/Kathmandu")).toBe(
+      false,
+    );
+    expect(isWorkingTime(new Date("2026-01-15T03:15Z"), "Asia/Kathmandu")).toBe(
+      true,
+    );
+  });
+  it("applies the daily 9–5 rule on weekends and across date lines", () => {
+    expect(isWorkingTime(new Date("2026-01-18T10:00Z"), "Europe/Rome")).toBe(
+      true,
+    );
+    expect(
+      isWorkingTime(new Date("2026-01-15T19:00Z"), "Pacific/Kiritimati"),
+    ).toBe(true);
+    expect(
+      isWorkingTime(new Date("2026-01-15T19:00Z"), "Pacific/Pago_Pago"),
+    ).toBe(false);
   });
 });
 

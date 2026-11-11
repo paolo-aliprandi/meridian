@@ -727,6 +727,43 @@ h2 > span {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 13px;
 }
+.working-summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 20px;
+  margin: -8px 0 20px;
+  font-size: 11px;
+  line-height: 1.7;
+  color: #a0adb1;
+}
+.working-summary strong {
+  color: #d3ddce;
+  font-weight: 500;
+}
+.working-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 9px;
+  min-height: 22px;
+  font-size: 11px;
+  color: #9aa8ad;
+}
+.working-status > span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+.working-status.is-working {
+  color: var(--lime);
+}
+.working-status.is-off-hours > span {
+  background: transparent;
+  border: 1px solid currentColor;
+}
 .clock-card {
   position: relative;
   border: 1px solid #ffffff13;

@@ -27,6 +27,7 @@ import {
   dateLabel,
   differenceLabel,
   isDaytime,
+  isWorkingTime,
   localInput,
   parseLocalInput,
   places,
@@ -97,6 +98,9 @@ function App() {
   const restoreFocus = useRef<HTMLElement | null>(null);
   const instant = customInstant ?? now;
   const destination = hover?.zone ?? selected;
+  const workingCount = favorites.filter((zone) =>
+    isWorkingTime(instant, zone),
+  ).length;
   const homeTime = timeError ? "--:--" : clock(instant, home);
   const destinationTime = timeError ? "--:--" : clock(instant, destination);
   const dayDifference = calendarDayDifference(destination, home, instant);
@@ -544,7 +548,7 @@ function App() {
         >
           <div className="section-heading">
             <div>
-              <span className="eyebrow">MORE PLACES, AT A GLANCE</span>
+              <span className="eyebrow">WHO'S IN THEIR 9–5?</span>
               <h2 id="world-clock-heading">
                 Your world clock<span>.</span>
               </h2>
@@ -553,10 +557,21 @@ function App() {
               <Plus size={16} /> Add a place
             </button>
           </div>
+          <div className="working-summary">
+            <strong>
+              {timeError
+                ? "Choose a valid date & time to check working hours."
+                : `${workingCount} of ${favorites.length} places in working hours${customInstant ? " at your selected time" : " now"}.`}
+            </strong>
+            <span>
+              Add places to compare. 09:00–17:00 local time, every day.
+            </span>
+          </div>
           <div className="clock-grid">
             {favorites.map((zone) => {
               const daylight = isDaytime(instant, zone);
               const active = selected === zone;
+              const working = isWorkingTime(instant, zone);
               return (
                 <article
                   className={`clock-card ${active ? "clock-selected" : ""}`}
@@ -580,7 +595,19 @@ function App() {
                         {active ? "EXPLORING" : ""}
                       </span>
                     </span>
-                    <div className="city-time">{clock(instant, zone)}</div>
+                    <div className="city-time">
+                      {timeError ? "--:--" : clock(instant, zone)}
+                    </div>
+                    <span
+                      className={`working-status ${timeError ? "" : working ? "is-working" : "is-off-hours"}`}
+                    >
+                      <span aria-hidden="true" />
+                      {timeError
+                        ? "Time needs fixing"
+                        : working
+                          ? "Working · 9–5"
+                          : "Outside 9–5"}
+                    </span>
                     <div className="clock-card-bottom">
                       <span>{dateLabel(instant, zone)}</span>
                       <span>

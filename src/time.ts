@@ -144,6 +144,11 @@ export function isDaytime(instant: Date, zone: string): boolean {
   return hour >= 7 && hour < 19;
 }
 
+export function isWorkingTime(instant: Date, zone: string): boolean {
+  const hour = Number(clock(instant, zone).slice(0, 2));
+  return hour >= 9 && hour < 17;
+}
+
 export const places = [
   {
     zone: "America/Los_Angeles",

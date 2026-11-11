@@ -167,6 +167,76 @@ test("clock labels change between EST EDT and CET CEST with the chosen date", as
   );
 });
 
+test("selected places show 9–5 status at the chosen time and update on add/remove", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await page.getByLabel("Your date and time").fill("2026-01-15T08:59");
+  const tokyo = page.locator(".clock-card").filter({
+    has: page.getByRole("button", { name: "Explore Tokyo", exact: true }),
+  });
+  await expect(tokyo.locator(".working-status")).toHaveText("Working · 9–5");
+  await expect(page.locator(".working-summary strong")).toHaveText(
+    "1 of 4 places in working hours at your selected time.",
+  );
+  await page.getByLabel("Your date and time").fill("2026-01-15T09:00");
+  await expect(tokyo.locator(".working-status")).toHaveText("Outside 9–5");
+  await expect(page.locator(".working-summary strong")).toHaveText(
+    "0 of 4 places in working hours at your selected time.",
+  );
+
+  await page.getByRole("button", { name: "Add a place" }).click();
+  await selectZone(page, "Asia/Kathmandu");
+  await page.getByLabel("Your date and time").fill("2026-01-15T04:15");
+  const kathmandu = page.locator(".clock-card").filter({
+    has: page.getByRole("button", { name: "Explore Kathmandu", exact: true }),
+  });
+  await expect(kathmandu.locator(".city-time")).toHaveText("09:00");
+  await expect(kathmandu.locator(".working-status")).toHaveText(
+    "Working · 9–5",
+  );
+  await expect(page.locator(".working-summary strong")).toHaveText(
+    "3 of 5 places in working hours at your selected time.",
+  );
+  await page.setViewportSize({ width: 320, height: 720 });
+  await kathmandu.scrollIntoViewIfNeeded();
+  await expect(kathmandu.locator(".working-status")).toBeVisible();
+  expect(
+    await kathmandu.evaluate(
+      (element) => element.scrollWidth <= element.clientWidth,
+    ),
+  ).toBe(true);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: `${process.env.ARTIFACT_DIR || "test-results"}/meridian-working-hours-mobile.png`,
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "Remove Kathmandu" }).click();
+  await expect(page.locator(".working-summary strong")).toHaveText(
+    "2 of 4 places in working hours at your selected time.",
+  );
+
+  await page.locator(".conversion-origin .conversion-place").click();
+  await selectZone(page, "America/New_York");
+  await page.getByLabel("Your date and time").fill("2026-11-01T01:30");
+  await expect(page.locator(".working-summary strong")).toHaveText(
+    "Choose a valid date & time to check working hours.",
+  );
+  await expect(page.locator(".working-status.is-working")).toHaveCount(0);
+  await expect(page.locator(".working-status").first()).toHaveText(
+    "Time needs fixing",
+  );
+  await page.getByRole("button", { name: "Live", exact: true }).click();
+  await expect(page.locator(".working-summary strong")).toContainText(
+    "places in working hours now.",
+  );
+  await expect(page.locator(".working-status")).toHaveCount(4);
+});
+
 test("search, favorites and dialog keyboard interaction work without a mouse globe", async ({
   page,
 }) => {
