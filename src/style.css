@@ -5,6 +5,7 @@
   font-synthesis: none;
   font-weight: 400;
   --lime: #c5f78b;
+  --amber: #f2b66d;
   --muted: #7c838c;
   --border: #ffffff13;
   --display: "Space Grotesk", sans-serif;
@@ -367,6 +368,38 @@ a svg {
   z-index: 3;
   pointer-events: none;
   white-space: nowrap;
+}
+.globe-zone-legend {
+  position: absolute;
+  bottom: 76px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 14px;
+  padding: 6px 10px;
+  border-radius: 5px;
+  background: #050709c9;
+  font-size: 10px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 3;
+}
+.globe-zone-legend > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.globe-zone-legend i {
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: currentColor;
+}
+.legend-working {
+  color: var(--lime);
+}
+.legend-off-hours {
+  color: var(--amber);
 }
 .instruction-dot {
   color: #9aa3a7;
@@ -806,6 +839,9 @@ h2 > span {
 .working-status.is-working {
   color: var(--lime);
 }
+.working-status.is-off-hours {
+  color: var(--amber);
+}
 .working-status.is-off-hours > span {
   background: transparent;
   border: 1px solid currentColor;
@@ -816,14 +852,33 @@ h2 > span {
   border-radius: 7px;
   overflow: hidden;
   background: linear-gradient(130deg, #10151ac7, #0b0f13b0);
+  box-shadow: inset 0 2px 0 var(--zone-accent, transparent);
   transition: border-color 0.2s;
 }
+.clock-working {
+  --zone-accent: var(--lime);
+}
+.clock-off-hours {
+  --zone-accent: var(--amber);
+}
 .clock-card:hover {
-  border-color: #c5f78b50;
+  border-color: color-mix(
+    in srgb,
+    var(--zone-accent, var(--muted)) 40%,
+    transparent
+  );
 }
 .clock-selected {
-  border-color: #c5f78b4a;
-  background: linear-gradient(130deg, #17211ad9, #0c1312c7);
+  border-color: color-mix(
+    in srgb,
+    var(--zone-accent, var(--muted)) 40%,
+    transparent
+  );
+  background: linear-gradient(
+    130deg,
+    color-mix(in srgb, var(--zone-accent, var(--muted)) 8%, #0b0f13),
+    #0c1312c7
+  );
 }
 .clock-main {
   padding: 19px 20px 17px;

@@ -45,6 +45,9 @@ place shows **Working · 9–5** or **Outside 9–5**, with a count above the ca
 The rule is 09:00 inclusive to 17:00 exclusive in each place's local time,
 every day (not a weekday/holiday calendar). Statuses follow live time or the
 date and time entered in the converter, including daylight-saving changes.
+Selected places and hovered zones are highlighted on the globe: **green** during
+9–5, **amber** outside, with matching card accents and a legend. Colors update with
+the chosen time; invalid input makes highlights neutral until the time is fixed.
 
 On desktop, move within 8 pixels of a visible time-zone border: the cursor changes
 to a selection cursor. Drag to another border to highlight the zones along the

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import tzlookup from "tz-lookup";
-import { canonicalZone, solarPosition } from "./time";
+import { canonicalZone, isWorkingTime, solarPosition } from "./time";
 import { zonesBetween, type ScreenPoint } from "./selection";
 
 type Coordinate = [number, number];
@@ -18,6 +18,7 @@ type Props = {
   instant: Date;
   selectedZone: string;
   selectedZones: string[];
+  validTime: boolean;
   boundaries: boolean;
   rotating: boolean;
   focus: { lat: number; lon: number; key: number } | null;
@@ -64,8 +65,8 @@ const fragmentShader = `
     vec3 daylight = textureDay * (0.32 + 0.75 * max(sunlight, 0.0));
     vec3 night = textureDay * vec3(0.038, 0.06, 0.095) + textureNight * vec3(1.0, 0.8, 0.48) * 1.5;
     vec3 color = mix(night, daylight, day);
-    float selected = texture2D(selectionMap, vUv).r;
-    color = mix(color, vec3(0.60, 0.87, 0.43), selected * 0.29);
+    vec4 selected = texture2D(selectionMap, vUv);
+    color = mix(color, selected.rgb, selected.a * 0.52);
     float fresnel = pow(1.0 - max(dot(n, normalize(cameraPosition - vWorld)), 0.0), 3.5);
     color += vec3(0.14, 0.37, 0.55) * fresnel * (0.2 + day * 0.55);
     gl_FragColor = vec4(color, 1.0);
@@ -141,6 +142,13 @@ export default function Globe(props: Props) {
     selectionCanvas.height = 1024;
     const context = selectionCanvas.getContext("2d")!;
     const selectionTexture = new THREE.CanvasTexture(selectionCanvas);
+    selectionTexture.colorSpace = THREE.SRGBColorSpace;
+    const styles = getComputedStyle(document.documentElement);
+    const highlightColors = {
+      working: styles.getPropertyValue("--lime").trim(),
+      offHours: styles.getPropertyValue("--amber").trim(),
+      neutral: styles.getPropertyValue("--muted").trim(),
+    };
     const loader = new THREE.TextureLoader();
     let disposed = false;
     const textures: THREE.Texture[] = [selectionTexture];
@@ -596,14 +604,18 @@ export default function Globe(props: Props) {
       const selected = range
         ? range.zones
         : [...state.selectedZones, hover ?? state.selectedZone];
-      const nextSelectionKey = selected.join("|");
+      const nextSelectionKey = `${timeKey}:${state.validTime}:${selected.join("|")}`;
       if (geography && selectionKey !== nextSelectionKey) {
         selectionKey = nextSelectionKey;
         context.clearRect(0, 0, 2048, 1024);
-        context.fillStyle = "white";
         for (const zone of new Set(selected)) {
           const feature = featuresByZone.get(canonicalZone(zone));
           if (!feature) continue;
+          context.fillStyle = !state.validTime
+            ? highlightColors.neutral
+            : isWorkingTime(state.instant, zone)
+              ? highlightColors.working
+              : highlightColors.offHours;
           const polygons =
             feature.geometry.type === "Polygon"
               ? [feature.geometry.coordinates]

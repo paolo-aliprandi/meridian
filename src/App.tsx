@@ -256,6 +256,7 @@ function App() {
   }
 
   function changeTime(value: string) {
+    setNotice("");
     setInput(value);
     if (!value) {
       setTimeError("Choose a date and time, or select Live to return to now.");
@@ -336,6 +337,7 @@ function App() {
                 <button
                   className={`live-switch ${!customInstant && !timeError ? "is-live" : ""}`}
                   onClick={() => {
+                    setNotice("");
                     setCustomInstant(null);
                     setInput("");
                     setTimeError("");
@@ -488,7 +490,8 @@ function App() {
               <Globe
                 instant={instant}
                 selectedZone={selected}
-                selectedZones={rangeSelected ? favorites : []}
+                selectedZones={favorites}
+                validTime={!timeError}
                 boundaries={boundaries}
                 rotating={rotating}
                 focus={focus}
@@ -533,6 +536,26 @@ function App() {
               >
                 <Crosshair size={17} />
               </button>
+            </div>
+            <div
+              className="globe-zone-legend"
+              role="group"
+              aria-label="Time-zone highlight colors"
+            >
+              {timeError ? (
+                <span>Fix time to color zones</span>
+              ) : (
+                <>
+                  <span className="legend-working">
+                    <i aria-hidden="true" />
+                    Working 9–5
+                  </span>
+                  <span className="legend-off-hours">
+                    <i aria-hidden="true" />
+                    Outside 9–5
+                  </span>
+                </>
+              )}
             </div>
             <div className="globe-instruction">
               <Compass size={14} />
@@ -609,7 +632,7 @@ function App() {
               const working = isWorkingTime(instant, zone);
               return (
                 <article
-                  className={`clock-card ${active ? "clock-selected" : ""}`}
+                  className={`clock-card ${timeError ? "" : working ? "clock-working" : "clock-off-hours"} ${active ? "clock-selected" : ""}`}
                   key={zone}
                 >
                   <button

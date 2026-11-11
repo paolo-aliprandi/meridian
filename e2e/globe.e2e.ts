@@ -41,12 +41,103 @@ async function prepareBorderDrag(page: Page) {
   camera.updateMatrixWorld();
   return async (lat: number, lon: number) => {
     const projected = vector(lat, lon, 1.004).project(camera);
-    await page.mouse.move(
-      rect.x + ((projected.x + 1) * rect.width) / 2,
-      rect.y + ((1 - projected.y) * rect.height) / 2,
-    );
+    const point = {
+      x: rect.x + ((projected.x + 1) * rect.width) / 2,
+      y: rect.y + ((1 - projected.y) * rect.height) / 2,
+    };
+    await page.mouse.move(point.x, point.y);
+    return point;
   };
 }
+
+async function globePixel(page: Page, point: { x: number; y: number }) {
+  const image = await page.screenshot({
+    clip: {
+      x: Math.floor(point.x) - 3,
+      y: Math.floor(point.y) - 3,
+      width: 7,
+      height: 7,
+    },
+  });
+  return page.evaluate(async (png) => {
+    const image = new Image();
+    image.src = `data:image/png;base64,${png}`;
+    await image.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 7;
+    const context = canvas.getContext("2d")!;
+    context.drawImage(image, 0, 0);
+    const pixels = context.getImageData(0, 0, 7, 7).data;
+    const color = { r: 0, g: 0, b: 0 };
+    for (let i = 0; i < pixels.length; i += 4) {
+      color.r += pixels[i];
+      color.g += pixels[i + 1];
+      color.b += pixels[i + 2];
+    }
+    return { r: color.r / 49, g: color.g / 49, b: color.b / 49 };
+  }, image.toString("base64"));
+}
+
+test("globe colors distinguish working hours, update at 17:00, and neutralize invalid time", async ({
+  page,
+}) => {
+  const move = await prepareBorderDrag(page);
+  await move(25, -5);
+  await page.mouse.down();
+  await move(25, 25);
+  await page.mouse.up();
+  const algiers = page.locator(".clock-card").filter({
+    has: page.getByRole("button", { name: "Explore Algiers", exact: true }),
+  });
+  const tripoli = page.locator(".clock-card").filter({
+    has: page.getByRole("button", { name: "Explore Tripoli", exact: true }),
+  });
+  await page.getByLabel("Your date and time").fill("2026-01-15T16:59");
+  await expect(algiers).toHaveClass(/clock-working/);
+  await expect(tripoli).toHaveClass(/clock-off-hours/);
+  await expect(
+    page.getByRole("group", { name: "Time-zone highlight colors" }),
+  ).toContainText("Working 9–5");
+  const workingPixel = await move(27, 3);
+  const offHoursPixel = await move(27, 15);
+  await page.mouse.move(10, 10);
+  await expect
+    .poll(async () => {
+      const color = await globePixel(page, workingPixel);
+      return color.g - color.r;
+    })
+    .toBeGreaterThan(10);
+  const offHours = await globePixel(page, offHoursPixel);
+  expect(offHours.r - offHours.g).toBeGreaterThan(10);
+  await page.getByLabel("Your date and time").fill("2026-01-15T17:00");
+  await expect(algiers).toHaveClass(/clock-off-hours/);
+  await expect
+    .poll(async () => {
+      const color = await globePixel(page, workingPixel);
+      return color.r - color.g;
+    })
+    .toBeGreaterThan(10);
+  const outside = await globePixel(page, workingPixel);
+  const outsideChroma =
+    Math.max(outside.r, outside.g, outside.b) -
+    Math.min(outside.r, outside.g, outside.b);
+  await page.getByLabel("Your date and time").fill("2026-03-29T02:30");
+  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(algiers).not.toHaveClass(/clock-working|clock-off-hours/);
+  await expect(page.locator(".globe-zone-legend")).toHaveText(
+    "Fix time to color zones",
+  );
+  await expect(page.locator(".notice")).toHaveCount(0);
+  await expect
+    .poll(async () => {
+      const color = await globePixel(page, workingPixel);
+      return (
+        Math.max(color.r, color.g, color.b) -
+        Math.min(color.r, color.g, color.b)
+      );
+    })
+    .toBeLessThan(outsideChroma / 2);
+});
 
 test("border dragging previews, shrinks, reverses and compares selected zones", async ({
   page,
